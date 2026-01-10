@@ -4,15 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Live Tests</title>
-  <meta http-equiv="Content-Security-Policy"
-content="
-default-src 'self';
-font-src 'self' https://fonts.gstatic.com;
-style-src 'self' https://fonts.googleapis.com 'unsafe-inline';
-">
-
-  <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
-
 
 <!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -23,7 +14,7 @@ style-src 'self' https://fonts.googleapis.com 'unsafe-inline';
   margin:0;
   padding:0;
   box-sizing:border-box;
-  /* font-family:Arial, Helvetica, sans-serif; */
+  font-family:Arial, Helvetica, sans-serif;
 }
 body{ overflow-x:hidden; background:#0f172a; color:white; }
 
@@ -579,7 +570,7 @@ function startQuiz(quizId, status){
     return;
   }
   // ✅ GUARANTEED quizId pass
-  window.location.href = "https://jpr-guddu.github.io/live-quiz/liveQuiz.html?quizId=" + encodeURIComponent(quizId);
+  window.location.href = "liveQuiz.html?quizId=" + encodeURIComponent(quizId);
 }
 
 
