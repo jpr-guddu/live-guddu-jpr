@@ -1,301 +1,594 @@
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>User Panel – Class 10th Quiz</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Tests</title>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
 <style>
-*{box-sizing:border-box;}
-body{margin:0;font-family:Arial,sans-serif;background:#0f172a;color:white;}
-.box{width:95%;max-width:500px;margin:20px auto;background:#1e293b;padding:16px;border-radius:12px;}
-h2{text-align:center;font-size:22px;margin-bottom:10px;}
-h3{font-size:18px;margin-bottom:6px;}
-input,button{width:100%;padding:12px;margin:8px 0;border:none;border-radius:8px;font-size:15px;}
-input{background:#020617;color:white;border:1px solid #334155;}
-button{background:#334155;color:white;cursor:pointer;}
-button:hover{background:#475569;}
-#options button{margin:6px 0;font-size:15px;}
-.option-selected{background:#22c55e!important;color:#020617;font-weight:bold;}
-#startBox,#quizBox,#resultBox{display:none;}
-p{font-size:14px;margin:6px 0;}
-#scoreText{line-height:1.6;font-size:15px;}
-</style>
-</head>
-<body>
-
-<div class="box">
-<h2>Live Quiz by Jpr Guddu</h2>
-
-<div id="authBox">
-  <div id="signUpDiv">
-    <h3>Sign Up</h3>
-    <input id="suName" placeholder="Name">
-    <input id="suEmail" placeholder="Email">
-    <input id="suPass" type="password" placeholder="Password">
-    <button onclick="signUp()">Sign Up</button>
-    <p onclick="showSignIn()" style="cursor:pointer;color:#38bdf8">Already have ID? Sign In</p>
-  </div>
-
-  <div id="signInDiv" style="display:none">
-    <h3>Sign In</h3>
-    <input id="siId" placeholder="User ID">
-    <input id="siPass" type="password" placeholder="Password">
-    <button onclick="signIn()">Sign In</button>
-    <p onclick="showSignUp()" style="cursor:pointer;color:#38bdf8">Create new User ID</p>
-  </div>
-</div>
-
-<!-- START -->
-<div id="startBox">
-<p>👤 <span id="userShow"></span></p>
-<p>👥 Live Users: <span id="liveCount">0</span></p>
-<p>📅 Date: <span id="quizDate">--</span></p>
-<p>🕒 Time: <span id="quizTime">--</span></p>
-<p>Status: <b><span id="quizStatus">--</span></b></p>
-<p>⏱ Time Left: <span id="timeLeft">--:--</span></p>
-<button onclick="startQuiz()">Start Quiz</button>
-</div>
-
-<!-- QUIZ -->
-<div id="quizBox">
-<p>Total Time: <span id="qTime">--</span> sec</p>
-<h3 id="question"></h3>
-<div id="options"></div>
-<button id="nextBtn" onclick="nextQ()" disabled>Next</button>
-</div>
-
-<!-- RESULT -->
-<div id="resultBox">
-<h3 id="scoreText"></h3>
-</div>
-</div>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, doc, collection, setDoc, getDoc, getDocs, query, where, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-
-/* FIREBASE */
-const firebaseConfig={
-  apiKey:"AIzaSyA9jEFAe9gyM4Y8ijNq3I9UXfnpwTakrPc",
-  authDomain:"mystorage-c9eeb.firebaseapp.com",
-  projectId:"mystorage-c9eeb",
-  storageBucket:"mystorage-c9eeb.appspot.com",
-  messagingSenderId:"312232487382",
-  appId:"1:312232487382:web:bf7d8c563030d0e682dc77"
-};
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
-const auth= getAuth();
-
-/* QUIZ ID */
-const quizId = "class 10th";
-
-/* GLOBALS */
-let uid="", username="", email="";
-let questions=[], index=0, score=0, selected=null;
-let startTime=0, endTime=0, timerInt=null, qTimer=null, qTime=30;
-
-/* UI TOGGLE */
-window.showSignUp=()=>{ signUpDiv.style.display="block"; signInDiv.style.display="none"; }
-window.showSignIn=()=>{ signUpDiv.style.display="none"; signInDiv.style.display="block"; }
-
-/* SIGN UP */
-window.signUp=async()=>{
-  try{
-    const cred=await createUserWithEmailAndPassword(auth,suEmail.value,suPass.value);
-    uid=cred.user.uid;
-    username=suName.value; email=suEmail.value;
-    let userId;
-    while(true){
-      userId=Math.floor(100000+Math.random()*900000).toString();
-      if(!(await getDoc(doc(db,"users",userId))).exists()) break;
-    }
-    await setDoc(doc(db,"users",userId),{uid,username,email});
-    alert("Your User ID: "+userId);
-    showStart();
-  }catch(e){
-    if(e.code==="auth/email-already-in-use"){ alert("Email already registered"); showSignIn(); }
-    else alert(e.message);
-  }
-};
-
-/* SIGN IN */
-window.signIn=async()=>{
-  try{
-    const userId=siId.value.trim();
-    const password=siPass.value;
-    if(!userId || !password){ alert("Fill ID and Password"); return; }
-    const snap=await getDoc(doc(db,"users",userId));
-    if(!snap.exists()){ alert("Invalid User ID"); return; }
-    uid=snap.data().uid; username=snap.data().username; email=snap.data().email;
-    await signInWithEmailAndPassword(auth,email,password);
-    showStart();
-  }catch(e){ alert("Login failed: "+e.message); }
-};
-
-/* SHOW START */
-async function showStart(){
-  authBox.style.display="none";
-  startBox.style.display="block";
-  userShow.innerText=username;
-
-  const snap=await getDoc(doc(db,"liveQuiz",quizId));
-  if(!snap.exists()){ quizStatus.innerText="Quiz Not Found"; return; }
-  const qc=snap.data().quizControl;
-  if(!qc){ quizStatus.innerText="Quiz Schedule Missing"; return; }
-
-  startTime=qc.startTime; endTime=qc.endTime;
-
-  quizDate.innerText=new Date(startTime).toLocaleDateString("en-IN");
-  quizTime.innerText=new Date(startTime).toLocaleTimeString("en-IN",{hour:'2-digit',minute:'2-digit'})+
-                     " - "+
-                     new Date(endTime).toLocaleTimeString("en-IN",{hour:'2-digit',minute:'2-digit'});
-
-  // live users
-  onSnapshot(collection(db,"liveQuiz",quizId,"liveUsers"),snap=>{
-    liveCount.innerText=snap.size;
-  });
-
-  startCountdown();
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:Arial, Helvetica, sans-serif;
 }
+body{ overflow-x:hidden; background:#0f172a; color:white; }
+
+/* ===== LAYOUT ===== */
+.content{ 
+    display:flex; 
+    min-height:100vh; }
+
+/* ===== SIDEBAR ===== */
+.sidebar{
+  width:240px;
+  background:#1e1e2f;
+  height: 100vh;
+  /* padding:10px; */
+  overflow-x:hidden;
+  overflow-y:auto;
+}
+/* ===== SIDEBAR SCROLLBAR DECORATION ===== */
+.sidebar::-webkit-scrollbar {
+    width: 8px;              /* scrollbar ki width */
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #1e1e2f;       /* track ka color (sidebar ke color se match) */
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #87898ac7;     /* scrollbar ka color */
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #565758;       /* hover effect */
+}
+
+/* ===== FIREFOX SUPPORT ===== */
+.sidebar {
+    scrollbar-width: thin;           /* thin scrollbar */
+    scrollbar-color: #434444c7 #1e1e2f;  /* thumb color | track color */
+}
+
+
+.sidebar h3{ margin-bottom:10px; }
+.sidebar p{margin:15px;color:gray}
+.sidebar ul{ list-style:none; }
+.sidebar ul li{
+  padding:15px;
+  cursor:pointer;
+  font-size:13px;
+}
+.sidebar ul li:hover{ background:#3095ddc7; }
+
+/* ===== MAIN ===== */
+.mainAndFooter{ flex:1; }
+
+/* HEADER */
+#mainNav{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 10px;
+  /* background:#293235; */
+}
+#mainNav input{
+  flex:1;
+  padding:8px;
+  border:none;
+  /* width: 406px; */
+  border-radius:5px;
+  background: #ffffff;
+}
+#mainNav #getPass{
+  padding:8px 14px;
+  border:none;
+  background:green;
+  color:white;
+  border-radius:5px;
+}
+
+#navigation{
+    width:100%;
+  display:flex;
+  gap:30px;
+  /* justify-content:space-between; */
+  padding:10px 15px;
+  background:#e5e5e5;
+}
+
+#navigation h4{
+    cursor: pointer;
+    color:black;
+}
+
+#navigation span{
+  background:red;
+  border-radius:5px;
+  padding:5px 7px;
+  font-size:13px;
+  color:white;
+}
+
+.allTestList{
+    display:flex;
+    justify-content:center;
+    gap:30px;
+    padding:10px 0;
+    align-items: center;
+    /* background: red; */
+}
+
+
+.allTestList, button{
+    border:none;
+    outline: none;
+    cursor: pointer;
+    padding:6px;
+    border-radius:5px;
+    font-size:15px;
+}
+
+/* FILTER */
+/* .allLiveTestsElement{
+  padding:15px;
+} */
+.allLiveTestsElement{
+  padding:15px;
+
+  /* ✅ CENTER FIX */
+  max-width:1200px;     /* page ke beech me limit */
+  margin:0 auto;        /* poora block center */
+  /* background: blue; */
+}
+
+.allLiveTestsElement h3{
+    margin-top:40px;
+}
+/* ===== LIVE TEST GRID ===== */
+.allLiveTestContent{
+  margin-top:30px;
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(280px, 300px));
+  gap:20px;
+  /* background: red; */
+}
+
+
+/* ===== CARD ===== */
+.liveTestCard{
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.3);
+  transition:.3s;
+}
+.liveTestCard:hover{
+  transform:translateY(-4px);
+}
+
+.liveTestCard h3{
+  font-size:16px;
+  margin-bottom:8px;
+}
+
+.liveTestCard p{
+  font-size:13px;
+  color:#cbd5f5;
+  margin:4px 0;
+}
+
+/* STATUS */
+.liveTestStatus{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:5px;
+  font-size:12px;
+  margin-bottom:6px;
+}
+.status-live{ background:#16a34a; }
+.status-upcoming{ background:#f59e0b; color:black; }
+.status-ended{ background:#dc2626; }
 
 /* COUNTDOWN */
-function startCountdown(){
-  timerInt=setInterval(()=>{
-    const now=Date.now();
-    if(now<startTime){ quizStatus.innerText="Not Started"; timeLeft.innerText="Waiting"; }
-    else if(now<=endTime){
-      quizStatus.innerText="Running";
-      const r=Math.floor((endTime-now)/1000);
-      timeLeft.innerText=`${Math.floor(r/60)}:${(r%60).toString().padStart(2,'0')}`;
-    }else{
-      quizStatus.innerText="Ended"; timeLeft.innerText="00:00"; clearInterval(timerInt);
-    }
-  },1000);
+.liveCountdown{
+  margin-top:6px;
+  font-size:13px;
+  color:#facc15;
+  font-weight:bold;
 }
 
-/* START QUIZ */
+/* USERS */
+.liveUsers{
+  margin-top:4px;
+  font-size:12px;
+  color:#38bdf8;
+}
 
-let quizTimer = null;
+/* BUTTON */
+.liveTestCard button{
+  width:100%;
+  margin-top:10px;
+  padding:8px;
+  border:none;
+  border-radius:6px;
+  background:#3095ddc7;
+  color:white;
+  cursor:pointer;
+}
+.liveTestCard button:hover{
+  background:#1d4ed8;
+}
 
-window.startQuiz = async () => {
-    if(Date.now()<startTime || Date.now()>endTime){ alert("Quiz not running"); return; }
-    // startBox.style.display="none"; 
-    quizBox.style.display="block";
-    index=0; score=0; selected=null; qTime=30;
+/* MOBILE */
+/* @media(max-width:768px){
+  #mainNav{ flex-direction:column; }
+} */
 
-    // remove old timers if any
-    if(qTimer) clearInterval(qTimer);
-    if(quizTimer) clearInterval(quizTimer);
+/* ================================================= */
+/* ================= MOBILE FIX ==================== */
+/* ================================================= */
+@media (max-width:768px){
 
-    // check already attempted
-    const already=await getDoc(doc(db,"liveQuiz",quizId,"results",uid));
-    if(already.exists()){ alert("Already attempted"); return; }
+  /* 🔒 STOP LEFT–RIGHT SCROLL */
+  html, body{
+    overflow-x:hidden;
+  }
 
-    // add live user
-    await setDoc(doc(db,"liveQuiz",quizId,"liveUsers",uid),{username,userId:uid});
 
-    // load questions
-    const qSnap=await getDocs(query(collection(db,"liveQuiz",quizId,"questions")));
-    questions=[]; 
-    qSnap.forEach(d=>{
-        const data=d.data();
-        questions.push({
-            question: data.question,
-            o: data.o || data.options,
-            answer: data.answer ?? data.correct
-        });
-    });
+  /* ===== MAIN FULL WIDTH ===== */
+  .mainAndFooter{
+    width:100%;
+  }
 
-    if(questions.length===0){ alert("No questions found"); quizBox.style.display="none"; startBox.style.display="block"; return; }
+  /* ===== HEADER FIX ===== */
+  #mainNav{
+    flex-direction:column;
+    flex-direction:row;        /* 🔥 column → row */
+    align-items:center;
+    gap:8px;
+    gap:10px;
+    padding:10px 5px;
+  }
 
-    loadQ();
+  #mainNav input{
+    flex:1;                    /* input bada, button chhota */
+    width:auto;
+  }
 
-    // START TOTAL QUIZ TIMER
-    quizTimer = setInterval(() => {
-        if(Date.now() >= endTime){
-            clearInterval(quizTimer);
-            clearInterval(qTimer);
-            finish();  // auto finish quiz
-        }
-    }, 500); // check every 0.5 sec
+  #mainNav button{
+    white-space:nowrap;        /* button wrap na ho */
+  }
+
+  #navigation{
+    flex-wrap:wrap;
+    gap:50px;
+    justify-content:center;
+  }
+
+  /* ===== FILTER BUTTON CENTER ===== */
+  .allTestList{
+    flex-wrap:wrap;
+    gap:15px;
+    justify-content:center;
+  }
+
+  /* ===== CONTENT CENTER ===== */
+  .allLiveTestsElement{
+    padding:12px;
+    max-width:100%;
+  }
+
+  /* ===== LIVE TEST GRID (2 CARD) ===== */
+  .allLiveTestContent{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0,1fr));
+    gap:12px;
+  }
+
+  /* ===== CARD FIX ===== */
+  .liveTestCard{
+    padding:12px;
+    border-radius:8px;
+  }
+
+  .liveTestCard h3{
+    font-size:14px;
+  }
+
+  .liveTestCard p{
+    font-size:12px;
+  }
+
+  .liveTestCard button{
+    font-size:13px;
+    padding:7px;
+  }
+}
+
+/* ================= MENU BUTTON ================= */
+.menuBtn{
+  display:none;
+  background:none;
+  border:none;
+  font-size:22px;
+  cursor:pointer;
+}
+
+.sidebarOverlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.45);
+  z-index:999;
+  display:none;
+}
+
+@media (max-width:768px){
+
+  /* menu button show */
+  .menuBtn{
+    display:block;
+    color: white;
+    font-size: 30px;
+  }
+
+  /* sidebar hidden by default */
+  .sidebar{
+    position:fixed;
+    top:0;
+    left:0;
+    z-index:1000;
+    transform:translateX(-100%);
+    transition:.3s;
+  }
+
+  .sidebar.active{
+    transform:translateX(0);
+  }
+
+  .sidebarOverlay.active{
+    display:block;
+  }
+}
+
+/* ================= MOBILE ================= */
+
+
+
+</style>
+</head>
+
+<body>
+
+
+
+<div class="content">
+  <!-- <div class="sidebar">
+    <h3>Menu</h3>
+    <ul>
+      <li>Home</li>
+    </ul>
+  </div> -->
+        <div class="sidebar">
+            <h3>Menu</h3>
+
+            <ul>
+                <li onclick="loadPage('home.html')">Home</li>
+            </ul>
+
+            <p>Learn</p>
+            <ul>
+                <li>Maa Vidhya Coaching</li>
+                <li>Live Classes</li>
+                <li>Header Books</li>
+            </ul>
+
+            <p>Test</p>
+            <ul>
+                <li>Test Series</li>
+                <li onclick="live()">Live Tests & Quizzes</li>
+                <li>Previous Year Papers</li>
+                <li>Practice</li>
+                <li><a href="https://jpr-guddu.github.io/live-quiz/">Free Quizzes</a></li>
+                <li>Attempted Tests</li>
+                <li>Pass</li>
+                <li>Pass Pro</li>
+                <li>Pass Elite</li>
+                <li>Rank Predictor</li>
+            </ul>
+
+            <p>Miscellaneous</p>
+            <ul>
+                <li>Exam</li>
+                <li>Saved Questions</li>
+                <li>Doubts</li>
+                <li>GK & Current Affairs</li>
+            </ul>
+        </div>
+
+
+  <div class="mainAndFooter">
+    <div id="mainNav1">
+      <div class="header1" id="mainNav">
+        <button class="menuBtn" onclick="openSidebar()">☰</button>
+        <input placeholder="Search Test">
+        <button id="getPass">Get Pass</button>
+      </div>
+      
+      <!-- <div class="header2" id="navigation">
+        <h4>Daily Free <span>Live</span></h4>
+        <h4>Attempted</h4>
+      </div> -->
+      
+    </div>
+
+    <div class="allLiveTestsElement">
+      <!-- <div class="allTestList">
+            <button>All Tests</button>
+            <button>Pro Tests</button>
+            <button>Elite Tests</button>
+        </div>   -->
+      <h3>Live Tests & Quizzes</h3>
+      <div class="allLiveTestContent"></div>
+    </div>
+  </div>
+</div>
+<div class="sidebarOverlay" onclick="closeSidebar()"></div>
+<script>
+/* ===== FIREBASE CONFIG (APNA DALO) ===== */
+const firebaseConfig = {
+  apiKey: "AIzaSyA9jEFAe9gyM4Y8ijNq3I9UXfnpwTakrPc",
+  authDomain: "mystorage-c9eeb.firebaseapp.com",
+  databaseURL: "https://mystorage-c9eeb-default-rtdb.firebaseio.com",
+  projectId: "mystorage-c9eeb",
+  storageBucket: "mystorage-c9eeb.firebasestorage.app",
+  messagingSenderId: "312232487382",
+  appId: "1:312232487382:web:bf7d8c563030d0e682dc77"
 };
 
+/* 🔥 THIS LINE WAS MISSING */
+firebase.initializeApp(firebaseConfig);
 
-/* LOAD QUESTION */
-function loadQ(){
-  if(index>=questions.length){ finish(); return; }
-  const q=questions[index];
-  if(!q || !q.o){ console.error("Invalid question data:", q); finish(); return; }
+/* 🔥 NOW FIRESTORE */
+const db = firebase.firestore();
 
-  question.innerText=q.question;
-  options.innerHTML="";
-  q.o.forEach((x,i)=>{
-    const b=document.createElement("button");
-    b.innerText=x; b.onclick=()=>select(i,b);
-    options.appendChild(b);
-  });
-  nextBtn.disabled=true;
 
-  // reset question timer
-  clearInterval(qTimer);
-  qTime=30; qTimeDisplay();
-  qTimer=setInterval(()=>{
-    qTime--;
-    qTimeDisplay();
-    if(qTime<=0){ clearInterval(qTimer); nextQ(); }
+/* ===== COUNTDOWN ===== */
+function startCountdown(endTime, el){
+  const timer = setInterval(()=>{
+    const diff = endTime - Date.now();
+    if(diff <= 0){
+      el.innerText = "Time Over";
+      clearInterval(timer);
+      return;
+    }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000)/60000);
+    const s = Math.floor((diff % 60000)/1000);
+    el.innerText = `${h}h ${m}m ${s}s left`;
   },1000);
 }
 
-function qTimeDisplay(){ document.getElementById("qTime").innerText=qTime; }
-
-window.select=(i,b)=>{
-  selected=i;
-  document.querySelectorAll("#options button").forEach(x=>x.classList.remove("option-selected"));
-  b.classList.add("option-selected"); nextBtn.disabled=false;
+/* ===== LIVE USERS ===== */
+function listenLiveUsers(quizId, el){
+  db.collection("liveQuiz").doc(quizId)
+    .collection("liveUsers")
+    .onSnapshot(snap=>{
+      el.innerText = `👥 ${snap.size} Live Users`;
+    });
 }
 
-window.nextQ=()=>{
-  clearInterval(qTimer);
-  if(selected===questions[index].answer) score+=1;
-  index++; selected=null;
-  index<questions.length ? loadQ() : finish();
-}
+/* ===== LOAD QUIZZES ===== */
+async function loadLiveTests(){
+  const box = document.querySelector(".allLiveTestContent");
+  box.innerHTML = "Loading...";
 
-/* FINISH */
+  const snap = await db.collection("liveQuiz").get();
+  box.innerHTML = "";
 
-async function finish(){
-  clearInterval(qTimer);
-  quizBox.style.display="none"; 
-  resultBox.style.display="block";
-  await deleteDoc(doc(db,"liveQuiz",quizId,"liveUsers",uid));
+  snap.forEach(async (docSnap)=>{
+    const quizId = docSnap.id;
+    const qc = docSnap.data().quizControl || {};
 
-  // save result
-  await setDoc(doc(db,"liveQuiz",quizId,"results",uid),{
-    username,userId:uid,score
+    /* ===== STATUS ===== */
+    let status = "Upcoming";
+    if(qc.active === true) status = "Live";
+    if(qc.active === false && Date.now() > qc.endTime) status = "Ended";
+
+    const statusClass =
+      status==="Live" ? "status-live" :
+      status==="Upcoming" ? "status-upcoming" :
+      "status-ended";
+
+    /* ===== QUESTIONS COUNT (✅ FIX) ===== */
+    const qSnap = await db
+      .collection("liveQuiz")
+      .doc(quizId)
+      .collection("questions")
+      .get();
+
+    const qCount = qSnap.size;
+
+    /* ===== CARD ===== */
+    const card = document.createElement("div");
+    card.className = "liveTestCard";
+
+    card.innerHTML = `
+      <h3>${quizId.toUpperCase()}</h3>
+      <span class="liveTestStatus ${statusClass}">${status}</span>
+      <p>📘 Questions: <b>${qCount}</b></p>
+      <p>🕒 Start: ${qc.startTime ? new Date(qc.startTime).toLocaleString("en-IN") : "-"}</p>
+      <p>⏰ End: ${qc.endTime ? new Date(qc.endTime).toLocaleString("en-IN") : "-"}</p>
+    `;
+
+    /* ===== COUNTDOWN ===== */
+    const countdown = document.createElement("div");
+    countdown.className = "liveCountdown";
+    if(status === "Live"){
+      startCountdown(qc.endTime, countdown);
+    }else{
+      countdown.innerText = "Not Started";
+    }
+    card.appendChild(countdown);
+
+    /* ===== LIVE USERS ===== */
+    const users = document.createElement("div");
+    users.className = "liveUsers";
+    listenLiveUsers(quizId, users);
+    card.appendChild(users);
+
+    /* ===== BUTTON ===== */
+    const btn = document.createElement("button");
+    btn.innerText = status === "Live" ? "Join Now" : "View";
+
+    btn.onclick = () => {
+      if(status !== "Live"){
+        alert("Quiz abhi live nahi hai");
+        return;
+      }
+      window.location.href =
+        "vimal.html?quizId=" + encodeURIComponent(quizId);
+    };
+
+    card.appendChild(btn);
+    box.appendChild(card);
   });
-
-  // fetch all results to calculate topper and rank
-  const resSnap = await getDocs(collection(db,"liveQuiz",quizId,"results"));
-  const allResults = [];
-  resSnap.forEach(d=>allResults.push(d.data()));
-
-  // sort descending by score
-  allResults.sort((a,b)=>b.score - a.score);
-
-  const topper = allResults[0];
-  const rank = allResults.findIndex(r => r.userId === uid) + 1;
-
-  scoreText.innerHTML = `
-      👤 Your Name: <b>${username}</b><br>
-      🏆 Topper: <b>${topper.username}</b><br>
-      Score: <b>${score}</b><br>
-      Rank: <b>${rank}</b>
-  `;
 }
+
+function startQuiz(quizId, status){
+  console.log("Starting quiz:", quizId); // debug
+
+  if(status !== "Live"){
+    alert("Quiz abhi live nahi hai");
+    return;
+  }
+  // ✅ GUARANTEED quizId pass
+  window.location.href = "vimal.html?quizId=" + encodeURIComponent(quizId);
+}
+
+
+function openSidebar(){
+  document.querySelector(".sidebar").classList.add("active");
+  document.querySelector(".sidebarOverlay").classList.add("active");
+}
+
+function closeSidebar(){
+  document.querySelector(".sidebar").classList.remove("active");
+  document.querySelector(".sidebarOverlay").classList.remove("active");
+}
+
+
+
+
+loadLiveTests();
 </script>
+
 </body>
 </html>
